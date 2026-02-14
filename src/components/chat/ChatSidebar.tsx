@@ -9,21 +9,50 @@ import Image from "next/image";
 import { useEffect } from "react";
 
 const users = [
-  { id: "1", name: "Barbie", avatar: "https://randomuser.me/api/portraits/women/44.jpg" },
-  { id: "2", name: "Bob", avatar: "https://randomuser.me/api/portraits/men/32.jpg" },
-  { id: "3", name: "Donald", avatar: "https://randomuser.me/api/portraits/men/75.jpg" },
-  { id: "4", name: "Alex", avatar: "https://randomuser.me/api/portraits/men/51.jpg" },
-  { id: "5", name: "Katrina", avatar: "https://randomuser.me/api/portraits/women/68.jpg" },
-  { id: "6", name: "Mira", avatar: "https://randomuser.me/api/portraits/women/65.jpg" },
+  {
+    id: "1",
+    name: "Barbie",
+    avatar: "https://randomuser.me/api/portraits/women/44.jpg",
+  },
+  {
+    id: "2",
+    name: "Bob",
+    avatar: "https://randomuser.me/api/portraits/men/32.jpg",
+  },
+  {
+    id: "3",
+    name: "Donald",
+    avatar: "https://randomuser.me/api/portraits/men/75.jpg",
+  },
+  {
+    id: "4",
+    name: "Alex",
+    avatar: "https://randomuser.me/api/portraits/men/51.jpg",
+  },
+  {
+    id: "5",
+    name: "Katrina",
+    avatar: "https://randomuser.me/api/portraits/women/68.jpg",
+  },
+  {
+    id: "6",
+    name: "Mira",
+    avatar: "https://randomuser.me/api/portraits/women/65.jpg",
+  },
 ];
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const DroppableUser = ({ user, children }: any) => {
-  const { setNodeRef } = useDroppable({
+  const { setNodeRef, isOver } = useDroppable({
     id: user.id,
   });
 
   return (
-    <div ref={setNodeRef} className="relative mx-3">
+    <div
+      ref={setNodeRef}
+      className={`relative mx-3 transition ${
+        isOver ? "bg-pink-200 scale-105 shadow-lg" : ""
+      }`}
+    >
       {children}
     </div>
   );
@@ -48,7 +77,7 @@ export default function ChatSidebar() {
   /* =============================
       HANDLE CLICK
   ============================= */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleUserClick = (user: any) => {
     dispatch(setActiveUser(user));
     dispatch(clearUnread(user.id));

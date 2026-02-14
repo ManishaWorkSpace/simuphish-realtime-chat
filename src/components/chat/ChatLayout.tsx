@@ -7,6 +7,7 @@ import {
   DndContext,
   DragOverlay,
   PointerSensor,
+  pointerWithin,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
@@ -189,6 +190,7 @@ export default function ChatLayout() {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveMessage(null)}
+       collisionDetection={pointerWithin}
     >
       <div className="flex h-screen overflow-hidden bg-pink-50">
         <ChatSidebar />
@@ -199,9 +201,9 @@ export default function ChatLayout() {
           🔥 PREMIUM DRAG OVERLAY
       ===================================================== */}
 
-      <DragOverlay>
+      <DragOverlay adjustScale={false}>
         {activeMessage && (
-          <div className="px-4 py-3 bg-white rounded-2xl shadow-2xl scale-105 border border-pink-100">
+          <div className="px-4 py-3 bg-white rounded-2xl shadow-2xl scale-105 border border-pink-100 w-max max-w-[260px] pointer-events-none">
             {activeMessage.image ? (
               <Image
                 src={activeMessage.image}

@@ -47,7 +47,7 @@ export default function MessageInput({
     return () => {
       previews.forEach((p) => URL.revokeObjectURL(p.url));
     };
-  }, [previews]);
+  }, []);
 
   /* =============================
       TYPING (debounced)
@@ -154,12 +154,9 @@ export default function MessageInput({
           {previews.map((p, i) => (
             <div key={i} className="relative">
               {p.type === "image" ? (
-                <Image
+                <img
                   src={p.url}
-                  alt="product image"
-                  width={96}
-                  height={96}
-                  className="object-cover rounded-xl shadow-md"
+                  className="w-24 h-24 object-cover rounded-xl"
                 />
               ) : (
                 <video

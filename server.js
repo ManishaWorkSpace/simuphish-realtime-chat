@@ -22,11 +22,19 @@ Much better than storing socket ids directly
 let onlineUsers = new Map();
 
 const replies = [
-  "Sounds good 👍",
-  "Tell me more!",
-  "Got it 🙂",
-  "Interesting...",
-  "Let's do it 🚀",
+ "Interesting 🙂 tell me more!",
+  "Got it 👍 what happened next?",
+  "Hmm... I'm listening 👀",
+  "That sounds important.",
+  "Okay 🙂 I'm following you.",
+  "I see! Go on...",
+  "Alright 👍 continue.",
+  "Oh really? 😮",
+  "What made you think that?",
+  "How did that turn out?",
+  "And then what happened?",
+  "Wait — tell me more about that!",
+  "Now you’ve got my attention 👀",
 ];
 
 io.on("connection", (socket) => {

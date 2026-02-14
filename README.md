@@ -1,112 +1,104 @@
 # 🚀 SimuPhish Realtime Chat
 
-A production-ready realtime chat application built with **Next.js**, **Socket.io**, and **Redux Toolkit** that delivers instant messaging, typing indicators, media sharing, and live online presence.
+A production-grade realtime chat application built with **Next.js**, **Socket.io**, and **Redux Toolkit**, enabling seamless text and media communication with live synchronization, optimistic UI updates, and a highly interactive user experience.
+
+Designed with scalability and realtime performance in mind, this project demonstrates modern full-stack architecture and production deployment practices.
 
 ---
 
-## 🔥 Live Architecture
+## 🌐 Live Application
 
-Frontend deployed on **Vercel**  
-WebSocket server deployed on **Railway**
+👉 https://simuphish-chat-production.up.railway.app
 
-```
-User → Vercel (Next.js UI) → Railway (Socket Server)
-```
-
-This separation ensures scalability, reliability, and low-latency communication.
+*(Hosted entirely on Railway with integrated WebSocket support.)*
 
 ---
 
-## ✨ Features
+## 🧠 Architecture Overview
 
-✅ Realtime messaging  
-✅ Typing indicators  
-✅ Message delivery & seen status  
-✅ Media upload via Cloudinary  
-✅ Online/offline presence  
-✅ Persistent chat selection  
-✅ Optimistic UI updates  
-✅ Auto-reconnection sockets  
+This application follows a unified deployment architecture where both the frontend and WebSocket server run on the same Railway service.
+
+
+### Why this architecture?
+
+✅ Eliminates cross-domain socket issues  
+✅ Simplifies deployment  
+✅ Ensures low-latency communication  
+✅ Reduces infrastructure complexity  
+✅ Ideal for small-to-mid scale realtime applications  
 
 ---
 
-## 🧠 Tech Stack
+## ✨ Core Features
 
-**Frontend**
-- Next.js
+### 🔥 Realtime Messaging
+- Instant bi-directional communication powered by WebSockets  
+- Automatic message synchronization across connected clients  
+- Optimistic UI for zero perceived latency  
+
+---
+
+### 💬 Typing Indicators
+- Live typing feedback for active conversations  
+- Broadcast-based socket events for minimal overhead  
+
+---
+
+### 📦 Media Sharing via Cloudinary
+- Drag-and-drop uploads for images and videos  
+- Centralized cloud storage  
+- Instant preview before sending  
+- Asynchronous upload with realtime message replacement  
+
+---
+
+### 🔁 Message Delivery & Seen Status
+- Delivered and seen event tracking  
+- Status updates propagated in realtime  
+
+---
+
+### 👥 Online Presence
+- Tracks connected users using socket mapping  
+- Live online/offline updates  
+
+---
+
+### 💾 Persistent Draft Messages
+- Unsent messages are preserved across page refreshes  
+- Prevents accidental message loss  
+
+---
+
+### 🎯 Advanced Interaction Features
+- Drag-and-forward previously sent messages (including media)
+- Smooth UI transitions powered by Framer Motion
+- Highly responsive chat layout
+
+---
+
+## 🧰 Tech Stack
+
+### **Frontend**
+- Next.js (App Router)
 - TypeScript
-- Redux Toolkit
-- Framer Motion
+- Redux Toolkit (state management)
+- Framer Motion (animations)
 
-**Backend**
+### **Backend**
 - Node.js
 - Express
 - Socket.io
 
-**Infrastructure**
-- Vercel
-- Railway
-- Cloudinary
+### **Infrastructure**
+- Railway (Full-stack hosting)
+- Cloudinary (media storage)
 
 ---
 
-## ⚡ Getting Started
+## ⚡ Local Development Setup
 
-### Clone the repo
+### Clone repository
 
 ```bash
 git clone https://github.com/ManishaWorkSpace/simuphish-realtime-chat.git
-```
-
----
-
-### Install dependencies
-
-```bash
-npm install
-```
-
----
-
-### Run frontend
-
-```bash
-npm run dev
-```
-
----
-
-### Run socket server
-
-```bash
-cd server
-node server.js
-```
-
----
-
-## 🌍 Environment Variables
-
-Create `.env.local`:
-
-```
-NEXT_PUBLIC_SOCKET_URL=http://localhost:5000
-```
-
----
-
-## 🎯 Future Improvements
-
-- Redis adapter for horizontal scaling  
-- Message persistence with database  
-- Read receipts per user  
-- Push notifications  
-- Kubernetes-ready deployment  
-
----
-
-## 👩‍💻 Author
-
-**Manisha Yadav**
-
-Frontend Developer passionate about building scalable realtime applications.

@@ -1,152 +1,79 @@
 "use client";
 
+import { useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { motion } from "framer-motion";
 import { RootState } from "@/src/store/store";
-import { setActiveUser, clearUnread } from "@/src/features/chat/chatSlice";
-import { useDroppable } from "@dnd-kit/core";
-import Image from "next/image";
-import { useEffect } from "react";
+import { getSocket } from "@/src/services/socket";
+import { logoutUser, setOnlineUsers } from "@/src/store/slices/userSlice";
+import SidebarUser from "./SidebarUser";
+import { useRouter } from "next/navigation";
 
-const users = [
-  {
-    id: "1",
-    name: "Barbie",
-    avatar: "https://randomuser.me/api/portraits/women/44.jpg",
-  },
-  {
-    id: "2",
-    name: "Bob",
-    avatar: "https://randomuser.me/api/portraits/men/32.jpg",
-  },
-  {
-    id: "3",
-    name: "Donald",
-    avatar: "https://randomuser.me/api/portraits/men/75.jpg",
-  },
-  {
-    id: "4",
-    name: "Alex",
-    avatar: "https://randomuser.me/api/portraits/men/51.jpg",
-  },
-  {
-    id: "5",
-    name: "Katrina",
-    avatar: "https://randomuser.me/api/portraits/women/68.jpg",
-  },
-  {
-    id: "6",
-    name: "Mira",
-    avatar: "https://randomuser.me/api/portraits/women/65.jpg",
-  },
-];
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const DroppableUser = ({ user, children }: any) => {
-  const { setNodeRef, isOver } = useDroppable({
-    id: user.id,
-  });
-
-  return (
-    <div
-      ref={setNodeRef}
-      className={`relative mx-3 transition ${
-        isOver ? "bg-pink-200 scale-105 shadow-lg" : ""
-      }`}
-    >
-      {children}
-    </div>
-  );
-};
-
-export default function ChatSidebar() {
+export default function Sidebar() {
   const dispatch = useDispatch();
-  const { activeUser, unread } = useSelector((state: RootState) => state.chat);
+  const router = useRouter();
 
-  /* =============================
-      RESTORE ACTIVE USER
-  ============================= */
+  const { onlineUsers, currentUser } = useSelector(
+    (state: RootState) => state.user,
+  );
+
+  const socket = useMemo(() => getSocket(), []);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem("active-chat-user");
+    if (!socket) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handleOnlineUsers = (users: any) => {
+      dispatch(setOnlineUsers(users));
+    };
 
-    if (savedUser) {
-      dispatch(setActiveUser(JSON.parse(savedUser)));
-    }
-  }, [dispatch]);
+    socket.on("onlineUsers", handleOnlineUsers);
 
-  /* =============================
-      HANDLE CLICK
-  ============================= */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleUserClick = (user: any) => {
-    dispatch(setActiveUser(user));
-    dispatch(clearUnread(user.id));
-
-    localStorage.setItem("active-chat-user", JSON.stringify(user));
-  };
+    return () => {
+      socket.off("onlineUsers", handleOnlineUsers);
+    };
+  }, [socket, dispatch]);
 
   return (
-    <div className="w-[320px] flex flex-col border-r border-pink-100 bg-linear-to-b from-pink-50 via-rose-50 to-white shadow-xl">
-      <div className="p-6 border-b border-pink-100">
-        <h1 className="text-2xl font-semibold text-gray-800">Chats</h1>
-        <p className="text-sm text-gray-400 mt-1">Stay connected 💬</p>
-      </div>
+  <div className="w-72 h-screen flex flex-col bg-gradient-to-b from-white via-indigo-50/40 to-purple-50/40 shadow-xl">
 
-      <div className="flex-1 overflow-y-auto py-4 space-y-2">
-        {users.map((user) => {
-          const isActive = activeUser?.id === user.id;
-          const unreadCount = unread[user.id] || 0;
+  {/* Header */}
+  <div className="p-5 flex items-center justify-between bg-white/70 backdrop-blur-md shadow-sm">
 
-          return (
-            <DroppableUser key={user.id} user={user}>
-              <motion.div
-                layout
-                whileHover={{ scale: 1.02, x: 6 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => handleUserClick(user)}
-                className="relative flex items-center gap-4 p-3 rounded-2xl cursor-pointer mx-3"
-              >
-                {isActive && (
-                  <motion.div
-                    layoutId="active-pill"
-                    transition={{ type: "spring", stiffness: 500, damping: 40 }}
-                    className="absolute inset-0 rounded-2xl bg-pink-100 border border-pink-200 shadow-md"
-                  />
-                )}
-
-                <div className="relative flex items-center gap-4 w-full">
-                  <div className="relative">
-                    <Image
-                      src={user.avatar}
-                      alt="avatar"
-                      width={50}
-                      height={50}
-                      className="rounded-full shadow-sm"
-                    />
-
-                    <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-400 border-2 border-white rounded-full animate-pulse" />
-                  </div>
-
-                  <div className="flex-1">
-                    <p className="font-semibold text-gray-800">{user.name}</p>
-                    <p className="text-xs text-green-500 font-medium">Online</p>
-                  </div>
-
-                  {unreadCount > 0 && !isActive && (
-                    <motion.div
-                      initial={{ scale: 0.6 }}
-                      animate={{ scale: 1 }}
-                      className="min-w-5.5 h-5.5 flex items-center justify-center text-xs bg-pink-400 text-white rounded-full shadow"
-                    >
-                      {unreadCount}
-                    </motion.div>
-                  )}
-                </div>
-              </motion.div>
-            </DroppableUser>
-          );
-        })}
-      </div>
+    <div>
+      <p className="text-xl font-semibold bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">
+        Chats
+      </p>
+      <p className="text-xs text-gray-500 mt-1">
+        @{currentUser?.username}
+      </p>
     </div>
+
+    <button
+      onClick={() => {
+        sessionStorage.removeItem("user");
+        dispatch(logoutUser());
+        router.push("/login");
+      }}
+      className="px-3 py-1.5 text-xs font-medium rounded-lg bg-red-100 text-red-600 hover:bg-red-500 hover:text-white transition-all duration-300 cursor-pointer"
+    >
+      Logout
+    </button>
+  </div>
+
+  {/* Users List */}
+  <div className="flex-1 overflow-y-auto py-3">
+
+    {onlineUsers
+      .filter((u) => u.username !== currentUser?.username)
+      .map((user) => (
+        <div
+          key={user.username}
+          className="px-5 py-3 transition-all duration-300 hover:bg-white/60 hover:backdrop-blur-sm hover:shadow-sm cursor-pointer"
+        >
+          <SidebarUser user={user} />
+        </div>
+      ))}
+
+  </div>
+</div>
   );
 }

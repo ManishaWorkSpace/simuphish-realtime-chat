@@ -1,222 +1,186 @@
 "use client";
 
-import ChatSidebar from "./ChatSidebar";
-import ChatWindow from "./ChatWindow";
-
-import {
-  DndContext,
-  DragOverlay,
-  PointerSensor,
-  pointerWithin,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
-
+import { useEffect, useRef, useState } from "react";
+import { DndContext, DragOverlay } from "@dnd-kit/core";
 import { useDispatch, useSelector } from "react-redux";
-import {
-  addMessage,
-  setOnlineUsers,
-  incrementUnread,
-  updateMessageStatus,
-  setTypingUsers,
-} from "@/src/features/chat/chatSlice";
-
 import { RootState } from "@/src/store/store";
 import { getSocket } from "@/src/services/socket";
-import { getUserId } from "@/src/utils/getUserId";
 
-import { useState, useEffect, useRef } from "react";
-import Image from "next/image";
-import { v4 as uuidv4 } from "uuid";
+import { setUser } from "@/src/store/slices/userSlice";
+import {
+  addMessage,
+  setActiveChat,
+} from "@/src/store/slices/chatSlice";
+import { setDraft } from "@/src/store/slices/draftSlice";
+
+import Sidebar from "./ChatSidebar";
+import ChatWindow from "./ChatWindow";
+import MessageItem from "./MessageItem";
 
 export default function ChatLayout() {
-  const socket = getSocket();
   const dispatch = useDispatch();
+  const hydratedRef = useRef(false);
 
-  const activeUser = useSelector(
-    (state: RootState) => state.chat.activeUser
+  const chatState = useSelector((state: RootState) => state.chat);
+  const drafts = useSelector((state: RootState) => state.draft);
+  const currentUser = useSelector(
+    (state: RootState) => state.user.currentUser
   );
-
-  /*
-  ⭐ Prevent stale closures (CRITICAL in realtime apps)
-  */
-  const activeUserRef = useRef(activeUser);
-
-  useEffect(() => {
-    activeUserRef.current = activeUser;
-  }, [activeUser]);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const activeChat = chatState.activeChat;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [activeMessage, setActiveMessage] = useState<any>(null);
 
-  /*
-  =====================================================
-  🔥 SOCKET LISTENERS (STRICT MODE SAFE)
-  =====================================================
-  */
-
+  // ✅ HYDRATE REDUX (runs once safely)
   useEffect(() => {
-    const userId = getUserId();
+    if (hydratedRef.current) return;
+    hydratedRef.current = true;
 
-    socket.emit("register-user", userId);
+    const savedUser = sessionStorage.getItem("user");
+    const savedChat = localStorage.getItem("chat");
+    const savedDrafts = localStorage.getItem("drafts");
 
-    /*
-    ⭐ ALWAYS clear listeners first.
-    Prevents duplicate messages.
-    */
-    socket.off("receive-message");
-    socket.off("online-users");
-    socket.off("message-delivered");
-    socket.off("message-seen");
-    socket.off("user-typing");
-    socket.off("stop-typing");
+    if (savedUser) {
+      dispatch(setUser(JSON.parse(savedUser)));
+    }
 
-    /*
-    ✅ RECEIVE MESSAGE
-    */
-    socket.on("receive-message", (message) => {
-      dispatch(addMessage(message));
+    if (savedChat) {
+      const parsedChat = JSON.parse(savedChat);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+      parsedChat.messages?.forEach((msg: any) => {
+        dispatch(addMessage(msg));
+      });
 
-      // unread logic
-      if (message.chatId !== activeUserRef.current?.id) {
-        dispatch(incrementUnread(message.chatId));
+      if (parsedChat.activeChat) {
+        dispatch(setActiveChat(parsedChat.activeChat));
       }
+    }
 
-      /*
-      ⭐ Auto seen if chat is open
-      */
-      if (message.chatId === activeUserRef.current?.id) {
-        socket.emit("message-seen", { id: message.id });
-      }
-    });
+    if (savedDrafts) {
+      const parsedDrafts = JSON.parse(savedDrafts);
 
-    /*
-    ✅ ONLINE USERS
-    */
-    socket.on("online-users", (users) => {
-      dispatch(setOnlineUsers(users));
-    });
+      Object.entries(parsedDrafts).forEach(([username, text]) => {
+        dispatch(
+          setDraft({ username, text: text as string })
+        );
+      });
+    }
+  }, [dispatch]);
 
-    /*
-    ✅ DELIVERY ACK
-    */
-    socket.on("message-delivered", ({ id }) => {
-      dispatch(updateMessageStatus({ id, status: "delivered" }));
-    });
+  // ✅ SAVE USER
+  useEffect(() => {
+    if (currentUser) {
+      sessionStorage.setItem(
+        "user",
+        JSON.stringify(currentUser)
+      );
+    }
+  }, [currentUser]);
 
-    /*
-    ✅ SEEN ACK
-    */
-    socket.on("message-seen", ({ id }) => {
-      dispatch(updateMessageStatus({ id, status: "seen" }));
-    });
+  // ✅ SAVE CHAT
+  useEffect(() => {
+    if (hydratedRef.current) {
+      localStorage.setItem(
+        "chat",
+        JSON.stringify(chatState)
+      );
+    }
+  }, [chatState]);
 
-    /*
-    ✅ TYPING
-    */
-    socket.on("user-typing", (chatId) => {
-      dispatch(setTypingUsers([chatId]));
-    });
+  // ✅ SAVE DRAFTS
+  useEffect(() => {
+    if (hydratedRef.current) {
+      localStorage.setItem(
+        "drafts",
+        JSON.stringify(drafts)
+      );
+    }
+  }, [drafts]);
 
-    socket.on("stop-typing", () => {
-      dispatch(setTypingUsers([]));
+  // ✅ SOCKET AUTO REGISTER
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const socket = getSocket();
+    if (!socket) return;
+
+    if (socket.connected) {
+      socket.emit("register", currentUser);
+    }
+
+    socket.on("connect", () => {
+      socket.emit("register", currentUser);
     });
 
     return () => {
-      socket.off("receive-message");
-      socket.off("online-users");
-      socket.off("message-delivered");
-      socket.off("message-seen");
-      socket.off("user-typing");
-      socket.off("stop-typing");
+      socket.off("connect");
     };
-  }, [dispatch, socket]);
-
-  /*
-  =====================================================
-  🔥 DRAG SETUP
-  =====================================================
-  */
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    })
-  );
-
-  const senderId = getUserId();
-
-  /*
-  =====================================================
-  ⭐ DRAG HANDLERS
-  =====================================================
-  */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  }, [currentUser]);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleDragStart = (event: any) => {
-    setActiveMessage(event.active.data.current);
+    setActiveMessage(event.active.data.current?.message);
   };
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleDragEnd = (event: any) => {
-    const { over } = event;
+    const { active, over } = event;
 
-    if (!over || !activeMessage) {
+    if (!over || !currentUser) {
       setActiveMessage(null);
       return;
     }
 
-    /*
-    ⭐ Server is source of truth.
-    NEVER dispatch locally.
-    */
+    const draggedMessage =
+      active.data.current?.message;
+    const targetUser = over.data.current?.user;
 
-    const forwardedMessage = {
-      ...activeMessage,
-      id: uuidv4(),
-      timestamp: Date.now(),
-      chatId: over.id,
-      senderId,
-      status: "sending",
+    if (!draggedMessage || !targetUser) {
+      setActiveMessage(null);
+      return;
+    }
+
+    const socket = getSocket();
+
+    const newMessage = {
+      ...draggedMessage,
+      id: crypto.randomUUID(),
+      from: currentUser.username,
+      to: targetUser.username,
+      forwarded: true,
+      createdAt: new Date().toISOString(),
     };
 
-    socket.emit("send-message", forwardedMessage);
+    socket?.emit("sendMessage", {
+      to: targetUser.username,
+      message: newMessage,
+    });
 
     setActiveMessage(null);
   };
 
   return (
     <DndContext
-      sensors={sensors}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
-      onDragCancel={() => setActiveMessage(null)}
-       collisionDetection={pointerWithin}
     >
-      <div className="flex h-screen overflow-hidden bg-pink-50">
-        <ChatSidebar />
-        <ChatWindow />
+      <div className="flex h-screen bg-gray-200">
+        <Sidebar />
+
+        <div className="flex-1 bg-gray-50">
+          {activeChat ? (
+            <ChatWindow />
+          ) : (
+            <div className="flex items-center justify-center h-full text-gray-400 text-lg">
+              Select a user to start chatting 💬
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* =====================================================
-          🔥 PREMIUM DRAG OVERLAY
-      ===================================================== */}
-
-      <DragOverlay adjustScale={false}>
-        {activeMessage && (
-          <div className="px-4 py-3 bg-white rounded-2xl shadow-2xl scale-105 border border-pink-100 w-max max-w-[260px] pointer-events-none">
-            {activeMessage.image ? (
-              <Image
-                src={activeMessage.image}
-                alt="preview"
-                width={80}
-                height={180}
-                className="rounded-lg object-cover"
-              />
-            ) : (
-              <p className="text-sm">{activeMessage.text}</p>
-            )}
+      <DragOverlay>
+        {activeMessage ? (
+          <div className="opacity-90 scale-105">
+            <MessageItem message={activeMessage} />
           </div>
-        )}
+        ) : null}
       </DragOverlay>
     </DndContext>
   );

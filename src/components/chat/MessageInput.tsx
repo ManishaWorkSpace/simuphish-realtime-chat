@@ -1,209 +1,139 @@
 "use client";
 
-import { uploadToCloudinary } from "@/src/services/cloudinary";
+import { useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { RootState } from "@/src/store/store";
 import { getSocket } from "@/src/services/socket";
-import { getUserId } from "@/src/utils/getUserId";
-import Image from "next/image";
-import { useState, useRef, useEffect } from "react";
+import { addMessage } from "@/src/store/slices/chatSlice";
+import { setDraft } from "@/src/store/slices/draftSlice";
+import { uploadToCloudinary } from "@/src/services/cloudinary";
+import MediaPreview from "./MediaPreview";
 import { v4 as uuidv4 } from "uuid";
 
-type Preview = {
-  url: string;
-  type: "image" | "video";
-};
-
-export default function MessageInput({
-  activeChatId,
-}: {
-  activeChatId: string;
-}) {
+export default function MessageInput() {
   const socket = getSocket();
-  const senderId = getUserId();
+  const dispatch = useDispatch();
 
-  const [text, setText] = useState(() => {
-    if (typeof window === "undefined") return "";
+  const { activeChat } = useSelector(
+    (state: RootState) => state.chat
+  );
+  const currentUser = useSelector(
+    (state: RootState) => state.user.currentUser
+  );
+  const draftMessages = useSelector(
+    (state: RootState) => state.draft
+  );
 
-    return localStorage.getItem(`draft-${activeChatId}`) || "";
-  });
-
-  const [files, setFiles] = useState<File[]>([]);
-  const [previews, setPreviews] = useState<Preview[]>([]);
-
-  const typingTimeout = useRef<NodeJS.Timeout | null>(null);
-
-  /* =============================
-      SAVE DRAFT
-  ============================= */
-
-  useEffect(() => {
-    localStorage.setItem(`draft-${activeChatId}`, text);
-  }, [text, activeChatId]);
-
-  /* =============================
-      CLEANUP PREVIEW URLS
-  ============================= */
-
-  useEffect(() => {
-    return () => {
-      previews.forEach((p) => URL.revokeObjectURL(p.url));
-    };
-  }, []);
-
-  /* =============================
-      TYPING (debounced)
-  ============================= */
-
-  const handleTyping = (value: string) => {
-    setText(value);
-
-    socket.emit("typing", activeChatId);
-
-    if (typingTimeout.current) clearTimeout(typingTimeout.current);
-
-    typingTimeout.current = setTimeout(() => {
-      socket.emit("stop-typing", activeChatId);
-    }, 1200);
-  };
-
-  /* =============================
-      FILE PICKER
-  ============================= */
-
-  const handleFiles = (fileList: FileList | null) => {
-    if (!fileList) return;
-
-    const arr = Array.from(fileList);
-
-    setFiles((prev) => [...prev, ...arr]);
-
-    const newPreviews: Preview[] = arr.map((file) => ({
-      url: URL.createObjectURL(file),
-      type: file.type.startsWith("video")
-        ? ("video" as const)
-        : ("image" as const),
-    }));
-
-    setPreviews((prev) => [...prev, ...newPreviews]);
-  };
-
-  /* =============================
-      REMOVE MEDIA
-  ============================= */
-
-  const removeMedia = (index: number) => {
-    URL.revokeObjectURL(previews[index].url);
-
-    setFiles((prev) => prev.filter((_, i) => i !== index));
-    setPreviews((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  /* =============================
-      SEND MESSAGE
-  ============================= */
-
-  const sendMessage = async () => {
-    if (!text.trim() && files.length === 0) return;
-
-    const tempId = uuidv4();
-
-    // optimistic message
-    socket.emit("send-message", {
-      id: tempId,
-      text,
-      senderId,
-      chatId: activeChatId,
-      timestamp: Date.now(),
-      media: previews,
-      status: "uploading",
-    });
-
-    localStorage.removeItem(`draft-${activeChatId}`);
-
-    setText("");
-    setFiles([]);
-    setPreviews([]);
-
-    // upload real files
-    if (files.length > 0) {
-      const uploaded = await Promise.all(
-        files.map(async (file) => {
-          const url = await uploadToCloudinary(file);
-
-          return {
-            url,
-            type: file.type.startsWith("video")
-              ? ("video" as const)
-              : ("image" as const),
-          };
-        }),
+  const [text, setText] = useState(
+    draftMessages[activeChat || ""] || ""
+  );
+  const [file, setFile] = useState<File | null>(null);
+  const [loading, setLoading] = useState(false);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleChange = (e: any) => {
+    setText(e.target.value);
+    if (activeChat) {
+      dispatch(
+        setDraft({ username: activeChat, text: e.target.value })
       );
-
-      socket.emit("replace-media", {
-        id: tempId,
-        media: uploaded,
-        status: "sent",
-      });
+    }
+  };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleFileChange = (e: any) => {
+    if (e.target.files[0]) {
+      setFile(e.target.files[0]);
     }
   };
 
+ const handleSend = async () => {
+  if (!activeChat || !currentUser) return;
+
+  let mediaUrl = "";
+  let type: "text" | "image" | "video" = "text";
+
+  if (file) {
+    setLoading(true);
+
+    const res = await uploadToCloudinary(file);
+    mediaUrl = res.secure_url;
+    type = file.type.startsWith("video") ? "video" : "image";
+
+    setLoading(false);
+  }
+
+  if (!text.trim() && !file) return;
+
+  const newMessage = {
+    id: uuidv4(),
+    from: currentUser.username,
+    to: activeChat,
+    text,
+    media: mediaUrl,
+    type: file ? type : "text",
+    createdAt: new Date().toISOString(),
+  };
+
+  // ❌ REMOVE THIS:
+  // dispatch(addMessage(newMessage));
+
+  // ✅ ONLY emit
+  socket?.emit("sendMessage", {
+    to: activeChat,
+    message: newMessage,
+  });
+
+  setText("");
+  setFile(null);
+  dispatch(setDraft({ username: activeChat, text: "" }));
+};
   return (
-    <div className="border-t border-pink-100 bg-linear-to-b from-pink-50 to-white p-3 flex flex-col gap-3">
-      {/* MEDIA PREVIEW */}
-      {previews.length > 0 && (
-        <div className="flex gap-3 flex-wrap">
-          {previews.map((p, i) => (
-            <div key={i} className="relative">
-              {p.type === "image" ? (
-                <img
-                  src={p.url}
-                  className="w-24 h-24 object-cover rounded-xl"
-                />
-              ) : (
-                <video
-                  src={p.url}
-                  className="w-32 rounded-xl shadow-md"
-                  controls
-                />
-              )}
+   <div className="px-6 py-4 bg-white/80 backdrop-blur-md border-t border-gray-100 space-y-3 shadow-sm">
 
-              <button
-                onClick={() => removeMedia(i)}
-                className="absolute -top-2 -right-2 bg-white w-6 h-6 rounded-full shadow hover:bg-red-100"
-              >
-                ✕
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+  {/* Media Preview */}
+  {file && (
+    <MediaPreview
+      file={file}
+      onRemove={() => setFile(null)}
+    />
+  )}
 
-      {/* INPUT ROW */}
-      <div className="flex gap-2 items-center">
-        <label className="cursor-pointer bg-pink-200 hover:bg-pink-300 px-3 py-2 rounded-xl shadow">
-          📎
-          <input
-            hidden
-            multiple
-            type="file"
-            accept="image/*,video/*"
-            onChange={(e) => handleFiles(e.target.files)}
-          />
-        </label>
+  <div className="flex items-center gap-3">
 
-        <input
-          value={text}
-          onChange={(e) => handleTyping(e.target.value)}
-          placeholder="Type a message..."
-          className="flex-1 p-3 rounded-xl border border-pink-200 focus:ring-2 focus:ring-pink-300 outline-none"
-        />
+    {/* Hidden File Input */}
+    <input
+      type="file"
+      accept="image/*,video/*"
+      onChange={handleFileChange}
+      className="hidden"
+      id="mediaUpload"
+    />
 
-        <button
-          onClick={sendMessage}
-          className="bg-pink-400 hover:bg-pink-500 text-white px-5 py-2 rounded-xl shadow font-medium active:scale-95"
-        >
-          Send
-        </button>
-      </div>
-    </div>
+    {/* Attachment Button */}
+    <label
+      htmlFor="mediaUpload"
+      className="cursor-pointer w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 hover:bg-indigo-100 transition-all duration-300 text-lg shadow-sm hover:shadow-md"
+    >
+      📎
+    </label>
+
+    {/* Message Input */}
+    <input
+      value={text}
+      onChange={handleChange}
+      placeholder="Type a message..."
+      className="flex-1 px-5 py-3 rounded-full bg-white shadow-sm outline-none focus:shadow-indigo-200 transition-all duration-300"
+    />
+
+    {/* Send Button */}
+    <button
+      onClick={handleSend}
+      disabled={loading}
+      className="px-6 py-2.5 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-medium shadow-md hover:shadow-lg hover:scale-[1.05] active:scale-[0.95] transition-all duration-300 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      {loading ? "Uploading..." : "Send"}
+    </button>
+
+  </div>
+</div>
   );
 }
